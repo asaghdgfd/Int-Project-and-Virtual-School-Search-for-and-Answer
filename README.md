@@ -1,4 +1,4 @@
-# Int-Project-and-Virtual-School-Search-for-and-Answer
+# Search-for-and-Answer-use-Database
 is a high-efficiency Google Chrome Extension designed to automate the process of finding exam answers and educational content directly from a browser tab. Built on the modern
 
 An interactive, floating PiP (Picture-in-Picture) styled Chrome Extension designed to scrape or manually input keywords and query a Python backend hosted locally or on an AWS EC2 instance. It helps parse exam/quiz content on screen instantly.
