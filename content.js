@@ -135,6 +135,19 @@ function toggleUI() {
                 pointer-events: none;
                 line-height: 1;
             }
+
+            /* URL hint label in manual tab */
+            #ds-url-hint {
+                display: none;
+                padding: 6px 10px;
+                background: #eef0ff;
+                border-radius: 6px;
+                font-size: 11px;
+                color: #5865F2;
+                font-weight: 600;
+                line-height: 1.4;
+                word-break: break-all;
+            }
         </style>
 
         <!-- ── Header / Drag Handle ── -->
@@ -150,7 +163,7 @@ function toggleUI() {
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:17px; line-height:1;">🔍</span>
                 <span style="color:white; font-weight:700; font-size:15px; letter-spacing:0.3px;">Discord Search</span>
-                <span style="color:rgba(255,255,255,0.5); font-size:10px; margin-top:1px;">v1.1</span>
+                <span style="color:rgba(255,255,255,0.5); font-size:10px; margin-top:1px;">v1.2</span>
             </div>
             <button id="ds-close-btn" style="
                 background: rgba(255,255,255,0.18);
@@ -244,7 +257,7 @@ function toggleUI() {
                 <input
                     id="ds-manual-input"
                     type="text"
-                    placeholder="พิมพ์ keyword ที่ต้องการค้นหา..."
+                    placeholder="พิมพ์ keyword หรือวาง URL รูปภาพ..."
                     style="
                         width: 100%;
                         padding: 10px 12px;
@@ -255,6 +268,9 @@ function toggleUI() {
                         background: white;
                     "
                 />
+                <!-- URL hint: shows extracted keyword when image URL is detected -->
+                <div id="ds-url-hint"></div>
+
                 <button id="ds-manual-btn" style="
                     width: 100%;
                     padding: 12px;
@@ -341,8 +357,30 @@ function toggleUI() {
     const subjectList      = document.getElementById('ds-subject-list');
     const modeSelect       = document.getElementById('ds-mode');
     const manualInput      = document.getElementById('ds-manual-input');
+    const urlHint          = document.getElementById('ds-url-hint');
 
     document.getElementById('ds-close-btn').addEventListener('click', () => container.remove());
+
+    // ─── Helper: extract keyword from raw input ───────────────────────────────
+    // If the value looks like an image URL, pull the filename (e.g. QI2408834)
+    // Otherwise return the trimmed value as-is.
+    function extractKeyword(value) {
+        const m = value.match(/\/([A-Za-z0-9_]+)\.(jpg|jpeg|png|gif)/i);
+        if (m && m[1]) return m[1];
+        return value.trim();
+    }
+
+    // ─── Manual input: live URL detection hint ────────────────────────────────
+    manualInput.addEventListener('input', () => {
+        const val = manualInput.value.trim();
+        if (val.startsWith('http') && /\/([A-Za-z0-9_]+)\.(jpg|jpeg|png|gif)/i.test(val)) {
+            const kw = extractKeyword(val);
+            urlHint.style.display = 'block';
+            urlHint.textContent   = '🖼️ ตรวจพบ URL รูปภาพ → keyword: "' + kw + '"';
+        } else {
+            urlHint.style.display = 'none';
+        }
+    });
 
     // ─── Tab switching ────────────────────────────────────────────────────────
     document.querySelectorAll('.ds-tab-btn').forEach(tab => {
@@ -371,7 +409,6 @@ function toggleUI() {
         if (e.target.id === 'ds-close-btn') return;
         isDragging = true;
         const rect = container.getBoundingClientRect();
-        // Convert bottom/right to top/left once dragging starts
         container.style.bottom = 'auto';
         container.style.right  = 'auto';
         container.style.top    = rect.top  + 'px';
@@ -387,7 +424,6 @@ function toggleUI() {
         if (!isDragging) return;
         let newLeft = origLeft + (e.clientX - dragStartX);
         let newTop  = origTop  + (e.clientY - dragStartY);
-        // Clamp within viewport
         newLeft = Math.max(0, Math.min(window.innerWidth  - container.offsetWidth,  newLeft));
         newTop  = Math.max(0, Math.min(window.innerHeight - container.offsetHeight, newTop));
         container.style.left = newLeft + 'px';
@@ -462,7 +498,6 @@ function toggleUI() {
 
                 if (res.success && res.data?.found && res.data.results?.length > 0) {
                     const rawResults = res.data.results;
-                    // ── Multiple subjects/categories? ────────────────────────
                     const subjects = res.data.subjects || res.data.categories || null;
                     if (subjects && subjects.length > 1) {
                         subjectChooser.style.display = 'flex';
@@ -476,7 +511,6 @@ function toggleUI() {
                             btn.innerHTML   = `📚 ${name} ${count ? `<span style="color:#aaa; font-size:11px;">(${count} ข้อ)</span>` : ''}`;
                             btn.addEventListener('click', () => {
                                 subjectChooser.style.display = 'none';
-                                // Filter by subject name or use index range
                                 let filtered = rawResults.filter(r =>
                                     (r.subject || r.category || '') === name
                                 );
@@ -491,7 +525,6 @@ function toggleUI() {
                             subjectList.appendChild(btn);
                         });
 
-                        // "Show all" button
                         document.getElementById('ds-subject-all-btn').onclick = () => {
                             subjectChooser.style.display = 'none';
                             searchResults = flattenResults(rawResults);
@@ -500,7 +533,6 @@ function toggleUI() {
                         };
 
                     } else {
-                        // Normal — no subject split
                         searchResults = flattenResults(rawResults);
                         paginationDiv.style.display = 'flex';
                         updateDisplay();
@@ -527,7 +559,6 @@ function toggleUI() {
         let textKeyword  = '';
         let imageKeyword = '';
 
-        // 1. Text selectors
         const textSelectors = [
             '.col-md-10.col-sm-10.col-xs-12',
             '.exam-sarabun.exam-question',
@@ -564,7 +595,6 @@ function toggleUI() {
             }
         }
 
-        // 2. Image filename keyword
         const imgEl = document.querySelector(
             'img[src*="/question_pic/"], .col-md-10.col-sm-10.col-xs-12 img, .exam-question img'
         );
@@ -573,7 +603,6 @@ function toggleUI() {
             if (m && m[1]) imageKeyword = m[1];
         }
 
-        // ── Both found → show chip chooser ───────────────────────────────────
         if (textKeyword && imageKeyword) {
             keywordChooser.style.display = 'flex';
             resultDiv.innerText = '📌 พบทั้งข้อความและรูปภาพ\nกรุณาเลือก keyword ที่ต้องการค้นหา';
@@ -596,7 +625,6 @@ function toggleUI() {
             return;
         }
 
-        // ── Single keyword ────────────────────────────────────────────────────
         const keyword = textKeyword || imageKeyword;
         if (!keyword) {
             resultDiv.innerText = "❌ ไม่พบข้อความหรือรูปภาพโจทย์บนหน้านี้";
@@ -607,11 +635,13 @@ function toggleUI() {
 
     // ─── MANUAL search ────────────────────────────────────────────────────────
     document.getElementById('ds-manual-btn').addEventListener('click', () => {
-        const kw = manualInput.value.trim();
-        if (!kw) {
+        const raw = manualInput.value.trim();
+        if (!raw) {
             resultDiv.innerText = "❌ กรุณาพิมพ์ keyword ก่อนค้นหา";
             return;
         }
+        // Extract keyword: if it's an image URL, pull the filename ID; otherwise use as-is
+        const kw = extractKeyword(raw);
         resetState();
         doSearch(kw);
     });
